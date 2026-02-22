@@ -14,7 +14,22 @@ const app = express();
 app.use(cors()); 
 app.use(express.json());
 
-app.get('/api/all-cars', async (req, res) => {
+const authenticateToken = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; 
+  
+    if (!token) return res.status(401).send('Access Denied: No Token Provided');
+  
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.user = decodedToken;
+      next(); 
+    } catch (error) {
+      res.status(403).send('Invalid Token');
+    }
+  };
+
+app.get('/api/all-cars', authenticateToken, async (req, res) => {
   try {
     const snapshot = await db.collection('cars').get();
     const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
