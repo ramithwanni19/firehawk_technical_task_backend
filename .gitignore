@@ -1,4 +1,4 @@
 package-lock.json
 node_modules/*
-serviceActKey.json
 .firebaserc
+serviceAccountKey.json
