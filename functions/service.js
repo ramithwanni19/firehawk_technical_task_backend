@@ -31,28 +31,42 @@ const authenticateToken = async (req, res, next) => {
 
   app.get('/api/all-cars', authenticateToken, async (req, res) => {
     try {
-      const { sortBy = 'name', direction = 'asc', limit = 10, lastDocId } = req.query;
-      let query = db.collection('cars')
-        .orderBy(sortBy, direction)
-        .limit(parseInt(limit));
-      if (lastDocId) {
-        const lastDoc = await db.collection('cars').doc(lastDocId).get();
-        if (lastDoc.exists) {
-          query = query.startAfter(lastDoc);
+        const { sortBy = 'make', direction = 'asc', limit = 10, lastDocId, ...filters } = req.query;
+        let query = db.collection('cars');
+
+        Object.keys(filters).forEach(key => {
+            let value = filters[key];
+            if (value && !isNaN(value) && typeof value === 'string' && value.trim() !== '') {
+                value = Number(value);
+            }
+
+            if (key === 'make') {
+                query = query.where('make', '>=', filters[key])
+                             .where('make', '<=', filters[key] + '\uf8ff');
+            } else if (value !== '' && value !== null) {
+                query = query.where(key, '==', value);
+            }
+        });
+
+        query = query.orderBy(sortBy, direction);
+
+        if (lastDocId) {
+            const lastDoc = await db.collection('cars').doc(lastDocId).get();
+            if (lastDoc.exists) query = query.startAfter(lastDoc);
         }
-      }
-      const snapshot = await query.get();
-      const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
-      res.status(200).json({
-        data: cars,
-        nextPageToken: lastVisible ? lastVisible.id : null
-      });
-  
+
+        const snapshot = await query.limit(parseInt(limit)).get();
+        const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+
+        res.status(200).json({
+            data: cars,
+            nextPageToken: lastVisible ? lastVisible.id : null
+        });
     } catch (error) {
-      res.status(500).send(error.message);
+        res.status(500).send(error.message);
     }
-  });
+});
 
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Backend server is running on http://${URL}:${PORT}`);
