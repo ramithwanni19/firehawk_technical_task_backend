@@ -29,15 +29,30 @@ const authenticateToken = async (req, res, next) => {
     }
   };
 
-app.get('/api/all-cars', authenticateToken, async (req, res) => {
-  try {
-    const snapshot = await db.collection('cars').get();
-    const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.status(200).json(cars);
-  } catch (error) {
-    res.status(500).send(error.message);
-  }
-});
+  app.get('/api/all-cars', authenticateToken, async (req, res) => {
+    try {
+      const { sortBy = 'name', direction = 'asc', limit = 10, lastDocId } = req.query;
+      let query = db.collection('cars')
+        .orderBy(sortBy, direction)
+        .limit(parseInt(limit));
+      if (lastDocId) {
+        const lastDoc = await db.collection('cars').doc(lastDocId).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      }
+      const snapshot = await query.get();
+      const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+      res.status(200).json({
+        data: cars,
+        nextPageToken: lastVisible ? lastVisible.id : null
+      });
+  
+    } catch (error) {
+      res.status(500).send(error.message);
+    }
+  });
 
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Backend server is running on http://${URL}:${PORT}`);
