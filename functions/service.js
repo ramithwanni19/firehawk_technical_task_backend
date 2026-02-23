@@ -31,42 +31,41 @@ const authenticateToken = async (req, res, next) => {
 
   app.get('/api/all-cars', authenticateToken, async (req, res) => {
     try {
-        const { sortBy = 'make', direction = 'asc', limit = 10, lastDocId, ...filters } = req.query;
-        let query = db.collection('cars');
+      const { sortBy = 'make', direction = 'asc', limit = 10, lastDocId, ...filters } = req.query;
+      let query = db.collection('cars');
+  
+      Object.keys(filters).forEach(key => {
+        let value = filters[key];
+        if (value && !isNaN(value) && typeof value === 'string' && value.trim() !== '') {
+          value = Number(value);
+      }
 
-        Object.keys(filters).forEach(key => {
-            let value = filters[key];
-            if (value && !isNaN(value) && typeof value === 'string' && value.trim() !== '') {
-                value = Number(value);
-            }
-
-            if (key === 'make') {
-                query = query.where('make', '>=', filters[key])
-                             .where('make', '<=', filters[key] + '\uf8ff');
-            } else if (value !== '' && value !== null) {
-                query = query.where(key, '==', value);
-            }
-        });
-
-        query = query.orderBy(sortBy, direction);
-
-        if (lastDocId) {
-            const lastDoc = await db.collection('cars').doc(lastDocId).get();
-            if (lastDoc.exists) query = query.startAfter(lastDoc);
-        }
-
-        const snapshot = await query.limit(parseInt(limit)).get();
-        const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const lastVisible = snapshot.docs[snapshot.docs.length - 1];
-
-        res.status(200).json({
-            data: cars,
-            nextPageToken: lastVisible ? lastVisible.id : null
-        });
+      if (key === 'make') {
+          query = query.where('make', '>=', filters[key])
+                       .where('make', '<=', filters[key] + '\uf8ff');
+      } else if (value !== '' && value !== null) {
+          query = query.where(key, '==', value);
+      }
+  });
+      const countSnapshot = await query.count().get();
+      const totalRecords = countSnapshot.data().count;
+      let dataQuery = query.orderBy(sortBy, direction);
+      if (lastDocId) {
+        const lastDoc = await db.collection('cars').doc(lastDocId).get();
+        dataQuery = dataQuery.startAfter(lastDoc);
+      }
+      const snapshot = await dataQuery.limit(Number(limit)).get();
+      const cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json({
+        data: cars,
+        totalRecords: totalRecords, 
+        nextPageToken: cars.length === Number(limit) ? cars[cars.length - 1].id : null
+      });
+  
     } catch (error) {
-        res.status(500).send(error.message);
+      res.status(500).json({ error: error.message });
     }
-});
+  });
 
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Backend server is running on http://${URL}:${PORT}`);
