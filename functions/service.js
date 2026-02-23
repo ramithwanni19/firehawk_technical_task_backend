@@ -85,6 +85,38 @@ app.post('/api/filter-cars', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/add-car', authenticateToken, async (req, res) => {
+  try {
+    const carData = req.body;
+    if (!carData.make || !carData.model) {
+      return res.status(400).json({ error: "Make and Model are required fields." });
+    }
+   const recordToSave = {
+      ...carData,
+      createdBy: req.user.email,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+   const docRef = await db.collection('cars').add(recordToSave);
+   res.status(201).json({
+      id: docRef.id,
+      ...recordToSave
+    });
+  } catch (error) {
+    console.error("Add Car Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/delete-car/:id', authenticateToken, async (req, res) => {
+  try {
+    const carId = req.params.id;
+    await db.collection('cars').doc(carId).delete();
+    res.json({ message: `Car ${carId} successfully deleted.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Backend server is running on http://${URL}:${PORT}`);
 });
