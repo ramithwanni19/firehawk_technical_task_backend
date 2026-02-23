@@ -48,7 +48,7 @@ async function uploadCSV() {
             horsepower: toNum(car.horsepower),
             weight: toNum(car.weight),
             acceleration: toNum(car.acceleration),
-            year: 1900 + toNum(car.model_year),
+            model_year: 1900 + toNum(car.model_year),
             origin: car.origin,
           });
         });
