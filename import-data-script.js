@@ -17,12 +17,12 @@ async function uploadCSV() {
     .on("data", (data) => {
       const cleanData = {};
       Object.keys(data).forEach((key) => {
-        cleanData[key.trim()] = data[key].trim();
+        cleanData[key.trim()] = data[key] ? data[key].trim() : "";
       });
       results.push(cleanData);
     })
     .on("end", async () => {
-      console.log(`${results.length} import started...`);
+      console.log(`${results.length} Starting import...`);
 
       const batchSize = 400;
       for (let i = 0; i < results.length; i += batchSize) {
@@ -32,32 +32,40 @@ async function uploadCSV() {
         chunk.forEach((car) => {
           const docRef = db.collection("cars").doc();
 
-          const fullName = car.name || "Unknown";
+          const fullName = (car.name || "unknown").trim();
           const nameParts = fullName.split(" ");
-          const make = nameParts[0];
-          const model = nameParts.slice(1).join(" ");
+          const make = nameParts[0] || "Unknown";
+          const model = nameParts.slice(1).join(" ") || "Unknown";
 
-          const toNum = (val) => (isNaN(parseFloat(val)) ? 0 : parseFloat(val));
+          const toNum = (val) => {
+            const parsed = parseFloat(val);
+            return isNaN(parsed) ? 0 : parsed;
+          };
 
           batch.set(docRef, {
             make: make.charAt(0).toUpperCase() + make.slice(1),
             model: model.charAt(0).toUpperCase() + model.slice(1),
             mpg: toNum(car.mpg),
-            cylinders: toNum(car.cylinders),
+            cylinders: Math.floor(toNum(car.cylinders)),
             displacement: toNum(car.displacement),
             horsepower: toNum(car.horsepower),
             weight: toNum(car.weight),
             acceleration: toNum(car.acceleration),
             model_year: 1900 + toNum(car.model_year),
-            origin: car.origin,
+            origin: car.origin || "Unknown",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         });
 
-        await batch.commit();
-        console.log(`Uploaded batch ${i / batchSize + 1}`);
+        try {
+          await batch.commit();
+          console.log(`Uploaded batch ${Math.floor(i / batchSize) + 1}`);
+        } catch (err) {
+          console.error("Batch commit failed: ", err);
+        }
       }
 
-      console.log("Completed uploading");
+      console.log("Completed uploading successfully.");
       process.exit();
     });
 }
