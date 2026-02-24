@@ -1,16 +1,16 @@
 const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
-const serviceAccount = require("./serviceAccountKey.json");
-const URL = "192.168.1.8";
-const PORT = 3000;
+const { json2csv } = require("json-2-csv");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 
 const app = express();
+const PORT = process.env.PORT || 8080;
+
 app.use(cors());
 app.use(express.json());
 
@@ -37,6 +37,7 @@ app.get("/api/all-cars", authenticateToken, async (req, res) => {
 
     const countSnapshot = await query.count().get();
     const totalRecords = countSnapshot.data().count;
+
     if (sortBy && sortBy.trim() !== "") {
       query = query.orderBy(sortBy, direction);
     }
@@ -59,6 +60,29 @@ app.get("/api/all-cars", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/export-cars-csv", authenticateToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection("cars").get();
+    const carData = snapshot.docs.map((doc) => doc.data());
+
+    if (carData.length === 0) {
+      return res.status(404).send("No data found.");
+    }
+    const csv = json2csv(carData);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=cars_backup.csv"
+    );
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error("Export Error:", error);
+    return res.status(500).send("Error: " + error.message);
   }
 });
 
@@ -114,10 +138,8 @@ app.delete("/api/delete-car/:id", authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = app;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Backend server is live on port ${PORT}`);
+});
 
-if (require.main === module) {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Backend server is running on http://${URL}:${PORT}`);
-  });
-}
+module.exports = app;

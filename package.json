@@ -3,10 +3,11 @@
     "cors": "^2.8.6",
     "csv-parser": "^3.2.0",
     "express": "^5.2.1",
-    "firebase-admin": "^13.6.1"
+    "firebase-admin": "^13.6.1",
+    "json-2-csv": "^5.5.10"
   },
   "scripts": {
-    "start": "node server.js",
+    "start": "node functions/service.js",
     "import": "node importData.js",
     "test": "jest"
   },
